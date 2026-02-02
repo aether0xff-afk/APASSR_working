@@ -170,6 +170,25 @@
   - `-p 1-1024`
   - `--top-ports 100`
 
+### 툴 계층(TOOL → WHAT/HOW/WHERE)
+
+이제 정책은 **툴 선택**을 상위 계층으로 두고, 각 툴마다 WHAT/HOW/WHERE 테이블을
+별도로 유지합니다. 즉, 실행 순서는 아래와 같습니다.
+
+1. TOOL 정책이 사용할 도구를 선택 (`nmap`, `http-headers`, ...).
+2. 선택된 TOOL에 대해 WHAT/HOW/WHERE 정책을 적용해 실제 커맨드 생성.
+
+툴별 WHAT/HOW/WHERE가 동일한 의미일 필요는 없습니다. 예를 들어 `http-headers`
+툴은 **curl 헤더 수집용 플래그(WHAT/HOW)** 와 **URL 경로(WHERE)** 로 구분하여
+정책 테이블을 구성했습니다.
+
+| TOOL | WHAT (A) | HOW (B) | WHERE (C) |
+| --- | --- | --- | --- |
+| nmap | 스캔 유형, NSE 스크립트 | 타이밍/리트라이/레이트 | 포트 범위/대상 |
+| http-headers | curl 헤더/메서드 플래그 | 타임아웃/리트라이 플래그 | 요청 경로 |
+
+> 참고: `--tool auto`를 사용하면 TOOL 정책이 자동으로 도구를 선택합니다.
+
 ---
 
 ## 보상 설계
@@ -280,9 +299,10 @@ python -m pentesting_rl
 옵션:
 
 - `--steps N`: 에피소드 스텝 수 지정 (기본 3)
-- `--compare-random`: 랜덤 베이스라인과 정책 실행 결과 비교
-- `--target HOST`: 로컬 데모 대신 지정한 대상 IP/호스트 스캔
-- `--ports 80,443,8080`: `--target` 실행 시 사용할 포트 목록
+  - `--compare-random`: 랜덤 베이스라인과 정책 실행 결과 비교
+  - `--target HOST`: 로컬 데모 대신 지정한 대상 IP/호스트 스캔
+  - `--ports 80,443,8080`: `--target` 실행 시 사용할 포트 목록
+  - `--tool nmap|http-headers|auto`: 대상 스캔에 사용할 도구 선택
 
 ---
 
