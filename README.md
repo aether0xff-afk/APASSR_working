@@ -25,7 +25,9 @@
   - [2) 로컬 nmap 데모 실행](#2-로컬-nmap-데모-실행)
   - [3) 한 줄 실행 (CLI)](#3-한-줄-실행-cli)
   - [4) GUI 실행 (Tkinter)](#4-gui-실행-tkinter)
-  - [5) Windows 전용 데모 스크립트](#5-windows-전용-데모-스크립트)
+  - [5) GUI 실행 (Streamlit)](#5-gui-실행-streamlit)
+  - [6) Windows 전용 데모 스크립트](#6-windows-전용-데모-스크립트)
+- [DVWA MVP 검증 절차](#dvwa-mvp-검증-절차)
 - [커맨드 생성 규칙](#커맨드-생성-규칙)
 - [로그/디버깅](#로그디버깅)
 - [구성 및 커스터마이징](#구성-및-커스터마이징)
@@ -308,6 +310,7 @@ python -m pentesting_rl
 - `--steps N`: 에피소드 스텝 수 지정 (기본 3)
   - `--compare-random`: 랜덤 베이스라인과 정책 실행 결과 비교
   - `--target HOST`: 로컬 데모 대신 지정한 대상 IP/호스트 스캔
+  - `--base-url http://HOST:PORT`: base_url 기준 대상 스캔
   - `--ports 80,443,8080`: `--target` 실행 시 사용할 포트 목록
   - `--tool nmap|http-headers|http-fetch|robots-sitemap|html-crawler|dir-enum|hint-scanner|stateful-http|param-influence|auto`: 대상 스캔에 사용할 도구 선택
 
@@ -329,7 +332,21 @@ GUI 기능:
 
 ---
 
-### 5) Windows 전용 데모 스크립트
+### 5) GUI 실행 (Streamlit)
+
+Streamlit 기반 GUI로 **base_url 입력, 실행 옵션 선택, runlog/report 조회**를 제공합니다.
+
+```bash
+streamlit run pentesting_rl/streamlit_app.py
+```
+
+### 6) Windows 전용 데모 스크립트
+
+## DVWA MVP 검증 절차
+
+DVWA Docker 환경에서 **runlog.jsonl + report.json 생성 여부**를 확인하는 절차는 아래 문서를 참고하세요.
+
+- [docs/dvwa_mvp_test.md](docs/dvwa_mvp_test.md)
 
 PowerShell에서 자동화 데모 실행:
 
