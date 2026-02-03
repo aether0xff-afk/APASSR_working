@@ -186,6 +186,13 @@
 | --- | --- | --- | --- |
 | nmap | 스캔 유형, NSE 스크립트 | 타이밍/리트라이/레이트 | 포트 범위/대상 |
 | http-headers | curl 헤더/메서드 플래그 | 타임아웃/리트라이 플래그 | 요청 경로 |
+| http-fetch | HTTP 메서드/헤더 | 타임아웃/리다이렉트 | 요청 경로 |
+| robots-sitemap | robots/sitemap 모드 | 타임아웃 | base 경로 |
+| html-crawler | HTML/JS 크롤링 모드 | 깊이/페이지 제한 | 시작 경로 |
+| dir-enum | 워드리스트 크기 | 메서드/타임아웃 | base 경로 |
+| hint-scanner | 힌트 스캔 모드 | 타임아웃 | 요청 경로 |
+| stateful-http | 쿠키/상태 유지 | 타임아웃/리다이렉트 | 요청 경로 |
+| param-influence | 파라미터 영향 측정 | 타임아웃/샘플 수 | 요청 경로 |
 
 > 참고: `--tool auto`를 사용하면 TOOL 정책이 자동으로 도구를 선택합니다.
 
@@ -302,7 +309,7 @@ python -m pentesting_rl
   - `--compare-random`: 랜덤 베이스라인과 정책 실행 결과 비교
   - `--target HOST`: 로컬 데모 대신 지정한 대상 IP/호스트 스캔
   - `--ports 80,443,8080`: `--target` 실행 시 사용할 포트 목록
-  - `--tool nmap|http-headers|auto`: 대상 스캔에 사용할 도구 선택
+  - `--tool nmap|http-headers|http-fetch|robots-sitemap|html-crawler|dir-enum|hint-scanner|stateful-http|param-influence|auto`: 대상 스캔에 사용할 도구 선택
 
 ---
 
