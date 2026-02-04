@@ -26,7 +26,6 @@
   - [3) 한 줄 실행 (CLI)](#3-한-줄-실행-cli)
   - [4) GUI 실행 (Tkinter)](#4-gui-실행-tkinter)
   - [5) GUI 실행 (Streamlit)](#5-gui-실행-streamlit)
-  - [6) Windows 전용 데모 스크립트](#6-windows-전용-데모-스크립트)
 - [DVWA MVP 검증 절차](#dvwa-mvp-검증-절차)
 - [커맨드 생성 규칙](#커맨드-생성-규칙)
 - [로그/디버깅](#로그디버깅)
@@ -225,6 +224,7 @@ Reward = Extrinsic + β * Intrinsic
 .
 ├─ pentesting_rl/
 │  ├─ __init__.py
+│  ├─ __main__.py      # CLI 진입점
 │  ├─ dmp.py            # DecisionMakingProcess 핵심 루프
 │  ├─ knowledge.py      # KK 정의 및 KnowledgeStorage
 │  ├─ parser.py         # nmap XML 파서
@@ -232,9 +232,13 @@ Reward = Extrinsic + β * Intrinsic
 │  ├─ prophecy.py       # 경량 predictor
 │  ├─ reward.py         # 보상 계산
 │  ├─ demo.py           # 로컬 데모 실행
-│  └─ gui.py            # Tkinter GUI
-├─ scripts/
-│  └─ windows_demo.ps1  # Windows용 데모 스크립트
+│  ├─ gui.py            # Tkinter GUI
+│  ├─ streamlit_app.py  # Streamlit GUI
+│  ├─ run_logging.py    # 실행 로그/보고서 저장
+│  ├─ run_session.py    # 실행 세션 헬퍼
+│  ├─ target_utils.py   # 대상/URL 유틸
+│  ├─ tools.py          # Tool 어댑터 레지스트리
+│  └─ webtools.py       # HTTP 기반 Tool 어댑터
 ├─ docs/                # 관련 문서
 └─ README.md
 ```
@@ -313,6 +317,7 @@ python -m pentesting_rl
   - `--base-url http://HOST:PORT`: base_url 기준 대상 스캔
   - `--ports 80,443,8080`: `--target` 실행 시 사용할 포트 목록
   - `--tool nmap|http-headers|http-fetch|robots-sitemap|html-crawler|dir-enum|hint-scanner|stateful-http|param-influence|auto`: 대상 스캔에 사용할 도구 선택
+  - `--report-dir PATH`: run.json/knowledge.json/graph.json/report.md 출력 경로 지정
 
 ---
 
@@ -326,8 +331,9 @@ GUI 기능:
 
 - 조건(Condition) 라디오 버튼: C0/C1/C2
 - 시나리오 선택: `single-flag` / `multistep-single-flag`
-- Target IP, 에피소드 수, 스텝 수 설정
+- Target IP/base URL/포트, 에피소드 수, 스텝 수 설정
 - 예언(Prophecy)/상상(Imagination) 토글
+- Tool 선택, Compare-random, Report dir 출력 지원
 - 실행 로그 및 요약 통계 표시
 
 ---
@@ -340,24 +346,11 @@ Streamlit 기반 GUI로 **base_url 입력, 실행 옵션 선택, runlog/report �
 streamlit run pentesting_rl/streamlit_app.py
 ```
 
-### 6) Windows 전용 데모 스크립트
-
 ## DVWA MVP 검증 절차
 
 DVWA Docker 환경에서 **runlog.jsonl + report.json 생성 여부**를 확인하는 절차는 아래 문서를 참고하세요.
 
 - [docs/dvwa_mvp_test.md](docs/dvwa_mvp_test.md)
-
-PowerShell에서 자동화 데모 실행:
-
-```powershell
-scripts\windows_demo.ps1
-```
-
-옵션:
-
-- `-PythonPath "C:\Python311\python.exe"`
-- `-NmapPath "C:\Program Files\Nmap\nmap.exe"`
 
 ---
 
@@ -410,8 +403,11 @@ GUI 실행 시에는 `[RUN]` 로그가 각 값을 표시합니다.
 | --- | --- | --- |
 | `--steps` | `3` | DMP 실행 스텝 수 |
 | `--target` | `""` (빈 값) | 로컬 데모 대신 스캔할 대상 IP/호스트 |
+| `--base-url` | `""` (빈 값) | base URL 기준 대상 스캔 |
 | `--ports` | `80,443,8080` | `--target` 사용 시 포트 리스트 |
 | `--compare-random` | `False` | 랜덤 베이스라인과 정책 비교 실행 |
+| `--tool` | `nmap` | 대상 스캔에 사용할 도구 선택 |
+| `--report-dir` | `""` (빈 값) | run.json/knowledge.json/graph.json/report.md 출력 경로 |
 
 #### GUI 입력값 (`python -m pentesting_rl.gui`)
 
