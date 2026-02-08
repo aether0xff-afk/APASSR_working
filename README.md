@@ -142,6 +142,12 @@
 - `PATH_HINT`, `PATH_SEEN_BUCKET_*`
 - `RAW_BANNER_APACHE_2_4`
 
+### 툴별 KK 문서
+
+툴 확장 시 참고할 수 있도록 **툴별 KK 입력/출력 정의**를 별도 문서로 관리합니다.
+
+- [docs/kk/README.md](docs/kk/README.md)
+
 ---
 
 ## 정책(WHAT/HOW/WHERE) 구조
