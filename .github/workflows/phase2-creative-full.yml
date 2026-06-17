@@ -1,0 +1,63 @@
+name: Phase 2 Creative Full Evaluation
+
+on:
+  push:
+    branches: ["v2"]
+  workflow_dispatch:
+
+jobs:
+  phase2-creative-full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Compile package
+        run: python -m compileall pentesting_rl
+
+      - name: Run full-scale creative graph evaluation
+        run: |
+          mkdir -p runs/phase2_creative_full
+          set +e
+          python -m pentesting_rl.phase2_creative_batch_eval \
+            --seeds 20260617 20260618 20260619 \
+            --scenarios 50 \
+            --steps 30 \
+            --out-dir runs/phase2_creative_full \
+            > runs/phase2_creative_full/phase2_creative_full.log 2>&1
+          status=$?
+          cat runs/phase2_creative_full/phase2_creative_full.log
+          exit $status
+
+      - name: Print full creative summary
+        if: always()
+        run: |
+          if [ -f runs/phase2_creative_full/phase2_creative_full_summary.csv ]; then
+            cat runs/phase2_creative_full/phase2_creative_full_summary.csv
+          fi
+          if [ -f runs/phase2_creative_full/phase2_creative_full_seed_summaries.csv ]; then
+            cat runs/phase2_creative_full/phase2_creative_full_seed_summaries.csv
+          fi
+          if [ -f runs/phase2_creative_full/phase2_creative_full.log ]; then
+            tail -120 runs/phase2_creative_full/phase2_creative_full.log
+          fi
+
+      - name: Upload full creative graph eval artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase2-creative-full-results
+          path: |
+            runs/phase2_creative_full/phase2_creative_full_runs.csv
+            runs/phase2_creative_full/phase2_creative_full_seed_summaries.csv
+            runs/phase2_creative_full/phase2_creative_full_summary.csv
+            runs/phase2_creative_full/phase2_creative_full_summary.json
+            runs/phase2_creative_full/phase2_creative_full.log
+          if-no-files-found: warn
