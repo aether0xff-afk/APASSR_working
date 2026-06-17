@@ -21,6 +21,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install scikit-learn pandas joblib
       - run: python -m compileall pentesting_rl
       - name: Collect public text clue data
         shell: bash
@@ -33,8 +35,16 @@ jobs:
             --max-files 180 \
             --max-per-label 300 \
             --max-noise 180
-      - name: Print dataset summary
-        run: cat runs/public_text_clues/public_text_clues_summary.json
+      - name: Train text clue classifier
+        run: |
+          python -m pentesting_rl.text_clue_classifier \
+            --data-dir runs/public_text_clues \
+            --out-dir runs/text_clue_classifier \
+            --save-model
+      - name: Print dataset and classifier summaries
+        run: |
+          cat runs/public_text_clues/public_text_clues_summary.json
+          cat runs/text_clue_classifier/metrics.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -45,4 +55,21 @@ jobs:
             runs/public_text_clues/public_text_clues_val.csv
             runs/public_text_clues/public_text_clues_test.csv
             runs/public_text_clues/public_text_clues_summary.json
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: text-clue-classifier-results
+          path: |
+            runs/text_clue_classifier/metrics.json
+            runs/text_clue_classifier/confusion_train.csv
+            runs/text_clue_classifier/confusion_val.csv
+            runs/text_clue_classifier/confusion_test.csv
+            runs/text_clue_classifier/predictions_train.csv
+            runs/text_clue_classifier/predictions_val.csv
+            runs/text_clue_classifier/predictions_test.csv
+            runs/text_clue_classifier/misclassified_train.csv
+            runs/text_clue_classifier/misclassified_val.csv
+            runs/text_clue_classifier/misclassified_test.csv
+            runs/text_clue_classifier/text_clue_classifier.joblib
           if-no-files-found: warn
