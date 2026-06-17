@@ -26,12 +26,13 @@ jobs:
         shell: bash
         run: |
           SOURCES="${{ github.event.inputs.sources || 'juice,nyu' }}"
-          python -m pentesting_rl.public_text_clue_collector \
+          python -m pentesting_rl.public_text_clue_collector_v3 \
             --sources "$SOURCES" \
             --out-dir runs/public_text_clues \
-            --max-lines-per-file 2000 \
-            --max-files 120 \
-            --max-per-label 300
+            --max-lines-per-file 120 \
+            --max-files 180 \
+            --max-per-label 300 \
+            --max-noise 180
       - name: Print dataset summary
         run: cat runs/public_text_clues/public_text_clues_summary.json
       - uses: actions/upload-artifact@v4
