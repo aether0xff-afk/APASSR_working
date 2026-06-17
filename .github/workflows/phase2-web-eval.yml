@@ -24,9 +24,9 @@ jobs:
       - name: Compile package
         run: python -m compileall pentesting_rl
 
-      - name: Run Phase 2 web policy comparison smoke
+      - name: Run Phase 2 memory-guided web policy comparison smoke
         run: |
-          python -m pentesting_rl.phase2_web_eval \
+          python -m pentesting_rl.phase2_web_eval_memory \
             --runs 4 \
             --steps 8 \
             --out-dir runs/phase2_web_eval
