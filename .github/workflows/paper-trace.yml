@@ -3,6 +3,8 @@ name: KSEF Paper Trace
 on:
   push:
     branches: ["v2"]
+  pull_request:
+    branches: ["main"]
   workflow_dispatch:
 
 jobs:
