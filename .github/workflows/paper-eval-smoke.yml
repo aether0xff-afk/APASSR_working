@@ -37,7 +37,13 @@ jobs:
         run: python -m pentesting_rl.web_probe_smoke
 
       - name: Run DMP web tool integration smoke
-        run: python -m pentesting_rl.dmp_web_smoke
+        run: |
+          mkdir -p runs
+          set +e
+          python -m pentesting_rl.dmp_web_smoke > runs/dmp_web_smoke.log 2>&1
+          status=$?
+          cat runs/dmp_web_smoke.log
+          exit $status
 
       - name: Run smoke paper evaluation
         run: |
@@ -63,6 +69,17 @@ jobs:
           if [ -f runs/public_text_clues/public_text_clues_summary.json ]; then
             cat runs/public_text_clues/public_text_clues_summary.json
           fi
+          if [ -f runs/dmp_web_smoke.log ]; then
+            cat runs/dmp_web_smoke.log
+          fi
+
+      - name: Upload DMP web smoke debug log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmp-web-smoke-debug
+          path: runs/dmp_web_smoke.log
+          if-no-files-found: warn
 
       - name: Upload smoke paper evaluation artifact
         if: always()
