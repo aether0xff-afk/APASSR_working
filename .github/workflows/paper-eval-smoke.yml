@@ -33,6 +33,9 @@ jobs:
       - name: Run text observer smoke check
         run: python -m pentesting_rl.text_observer_smoke
 
+      - name: Run web probe smoke check
+        run: python -m pentesting_rl.web_probe_smoke
+
       - name: Run smoke paper evaluation
         run: |
           python -m pentesting_rl.paper_eval \
