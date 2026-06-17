@@ -30,6 +30,9 @@ jobs:
       - name: Compile package
         run: python -m compileall pentesting_rl
 
+      - name: Run text observer smoke check
+        run: python -m pentesting_rl.text_observer_smoke
+
       - name: Run smoke paper evaluation
         run: |
           python -m pentesting_rl.paper_eval \
@@ -39,7 +42,7 @@ jobs:
 
       - name: Collect public text clue data
         run: |
-          python -m pentesting_rl.public_text_clue_collector \
+          python -m pentesting_rl.public_text_clue_collector_v3 \
             --sources juice \
             --out-dir runs/public_text_clues \
             --max-lines-per-file 120 \
