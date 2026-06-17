@@ -1,0 +1,56 @@
+name: KSEF Paper Evaluation Smoke
+
+on:
+  push:
+    branches: ["v2"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  paper-eval-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install nmap
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nmap
+          nmap --version
+
+      - name: Compile package
+        run: python -m compileall pentesting_rl
+
+      - name: Run smoke paper evaluation
+        run: |
+          python -m pentesting_rl.paper_eval \
+            --runs 1 \
+            --steps 3 \
+            --out-dir runs/paper_eval_smoke
+
+      - name: Print smoke summary CSV
+        if: always()
+        run: |
+          if [ -f runs/paper_eval_smoke/paper_eval_summary.csv ]; then
+            cat runs/paper_eval_smoke/paper_eval_summary.csv
+          fi
+
+      - name: Upload smoke paper evaluation artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-eval-smoke-results
+          path: |
+            runs/paper_eval_smoke/paper_eval_runs.csv
+            runs/paper_eval_smoke/paper_eval_summary.csv
+            runs/paper_eval_smoke/paper_eval_summary.json
+          if-no-files-found: warn
