@@ -1,0 +1,27 @@
+name: KSEF Paper Trace Smoke
+
+on:
+  push:
+    branches: ["v2"]
+  workflow_dispatch:
+
+jobs:
+  trace-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y nmap
+      - run: python -m compileall pentesting_rl
+      - run: python -m pentesting_rl.paper_trace --runs 1 --steps 3 --out-dir runs/paper_trace_smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: paper-trace-smoke-results
+          path: runs/paper_trace_smoke/paper_eval_steps.csv
+          if-no-files-found: warn
