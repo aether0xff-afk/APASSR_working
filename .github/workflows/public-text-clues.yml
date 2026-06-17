@@ -1,0 +1,44 @@
+name: Public Text Clue Dataset
+
+on:
+  push:
+    branches: ["v2"]
+  workflow_dispatch:
+    inputs:
+      sources:
+        description: "Comma-separated sources: juice,nyu"
+        required: false
+        default: "juice"
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m compileall pentesting_rl
+      - name: Collect public text clue data
+        shell: bash
+        run: |
+          SOURCES="${{ github.event.inputs.sources || 'juice' }}"
+          python -m pentesting_rl.public_text_clue_collector \
+            --sources "$SOURCES" \
+            --out-dir runs/public_text_clues \
+            --max-lines-per-file 120 \
+            --max-per-label 300
+      - name: Print dataset summary
+        run: cat runs/public_text_clues/public_text_clues_summary.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: public-text-clue-data
+          path: |
+            runs/public_text_clues/public_text_clues_all.csv
+            runs/public_text_clues/public_text_clues_train.csv
+            runs/public_text_clues/public_text_clues_val.csv
+            runs/public_text_clues/public_text_clues_test.csv
+            runs/public_text_clues/public_text_clues_summary.json
+          if-no-files-found: warn
