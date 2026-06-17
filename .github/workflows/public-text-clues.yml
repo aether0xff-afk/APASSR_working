@@ -10,12 +10,12 @@ on:
       sources:
         description: "Comma-separated sources: juice,nyu"
         required: false
-        default: "juice"
+        default: "juice,nyu"
 
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -25,11 +25,12 @@ jobs:
       - name: Collect public text clue data
         shell: bash
         run: |
-          SOURCES="${{ github.event.inputs.sources || 'juice' }}"
+          SOURCES="${{ github.event.inputs.sources || 'juice,nyu' }}"
           python -m pentesting_rl.public_text_clue_collector \
             --sources "$SOURCES" \
             --out-dir runs/public_text_clues \
-            --max-lines-per-file 120 \
+            --max-lines-per-file 2000 \
+            --max-files 120 \
             --max-per-label 300
       - name: Print dataset summary
         run: cat runs/public_text_clues/public_text_clues_summary.json
