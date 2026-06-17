@@ -26,10 +26,16 @@ jobs:
 
       - name: Run creativity-focused randomized web evaluation
         run: |
+          mkdir -p runs/phase2_creative_eval
+          set +e
           python -m pentesting_rl.phase2_creative_eval \
             --scenarios 6 \
             --steps 10 \
-            --out-dir runs/phase2_creative_eval
+            --out-dir runs/phase2_creative_eval \
+            > runs/phase2_creative_eval/phase2_creative_eval.log 2>&1
+          status=$?
+          cat runs/phase2_creative_eval/phase2_creative_eval.log
+          exit $status
 
       - name: Print creative evaluation summary
         if: always()
@@ -39,6 +45,9 @@ jobs:
           fi
           if [ -f runs/phase2_creative_eval/phase2_creative_eval_runs.csv ]; then
             head -30 runs/phase2_creative_eval/phase2_creative_eval_runs.csv
+          fi
+          if [ -f runs/phase2_creative_eval/phase2_creative_eval.log ]; then
+            tail -80 runs/phase2_creative_eval/phase2_creative_eval.log
           fi
 
       - name: Upload creative web eval artifact
@@ -50,4 +59,5 @@ jobs:
             runs/phase2_creative_eval/phase2_creative_eval_runs.csv
             runs/phase2_creative_eval/phase2_creative_eval_summary.csv
             runs/phase2_creative_eval/phase2_creative_eval_summary.json
+            runs/phase2_creative_eval/phase2_creative_eval.log
           if-no-files-found: warn
