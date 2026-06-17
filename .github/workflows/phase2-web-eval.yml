@@ -24,11 +24,11 @@ jobs:
       - name: Compile package
         run: python -m compileall pentesting_rl
 
-      - name: Run creativity-focused randomized web evaluation
+      - name: Run observation-graph creative web evaluation
         run: |
           mkdir -p runs/phase2_creative_eval
           set +e
-          python -m pentesting_rl.phase2_creative_eval \
+          python -m pentesting_rl.phase2_creative_graph_eval \
             --scenarios 6 \
             --steps 10 \
             --out-dir runs/phase2_creative_eval \
