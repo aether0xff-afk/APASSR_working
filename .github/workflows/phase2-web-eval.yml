@@ -1,0 +1,53 @@
+name: Phase 2 Web Policy Evaluation
+
+on:
+  push:
+    branches: ["v2"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  phase2-web-eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Compile package
+        run: python -m compileall pentesting_rl
+
+      - name: Run Phase 2 web policy comparison smoke
+        run: |
+          python -m pentesting_rl.phase2_web_eval \
+            --runs 4 \
+            --steps 8 \
+            --out-dir runs/phase2_web_eval
+
+      - name: Print Phase 2 summary
+        if: always()
+        run: |
+          if [ -f runs/phase2_web_eval/phase2_web_eval_summary.csv ]; then
+            cat runs/phase2_web_eval/phase2_web_eval_summary.csv
+          fi
+          if [ -f runs/phase2_web_eval/phase2_web_eval_runs.csv ]; then
+            head -20 runs/phase2_web_eval/phase2_web_eval_runs.csv
+          fi
+
+      - name: Upload Phase 2 web eval artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase2-web-eval-results
+          path: |
+            runs/phase2_web_eval/phase2_web_eval_runs.csv
+            runs/phase2_web_eval/phase2_web_eval_summary.csv
+            runs/phase2_web_eval/phase2_web_eval_summary.json
+          if-no-files-found: warn
