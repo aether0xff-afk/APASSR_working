@@ -10,7 +10,7 @@ on:
 jobs:
   phase2-web-eval:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 60
 
     steps:
       - name: Check out repository
@@ -24,40 +24,42 @@ jobs:
       - name: Compile package
         run: python -m compileall pentesting_rl
 
-      - name: Run observation-graph creative web evaluation
+      - name: Run full-scale creative graph evaluation
         run: |
-          mkdir -p runs/phase2_creative_eval
+          mkdir -p runs/phase2_creative_full
           set +e
-          python -m pentesting_rl.phase2_creative_graph_eval \
-            --scenarios 6 \
-            --steps 10 \
-            --out-dir runs/phase2_creative_eval \
-            > runs/phase2_creative_eval/phase2_creative_eval.log 2>&1
+          python -m pentesting_rl.phase2_creative_batch_eval \
+            --seeds 20260617 20260618 20260619 \
+            --scenarios 50 \
+            --steps 30 \
+            --out-dir runs/phase2_creative_full \
+            > runs/phase2_creative_full/phase2_creative_full.log 2>&1
           status=$?
-          cat runs/phase2_creative_eval/phase2_creative_eval.log
+          cat runs/phase2_creative_full/phase2_creative_full.log
           exit $status
 
-      - name: Print creative evaluation summary
+      - name: Print full creative summary
         if: always()
         run: |
-          if [ -f runs/phase2_creative_eval/phase2_creative_eval_summary.csv ]; then
-            cat runs/phase2_creative_eval/phase2_creative_eval_summary.csv
+          if [ -f runs/phase2_creative_full/phase2_creative_full_summary.csv ]; then
+            cat runs/phase2_creative_full/phase2_creative_full_summary.csv
           fi
-          if [ -f runs/phase2_creative_eval/phase2_creative_eval_runs.csv ]; then
-            head -30 runs/phase2_creative_eval/phase2_creative_eval_runs.csv
+          if [ -f runs/phase2_creative_full/phase2_creative_full_seed_summaries.csv ]; then
+            cat runs/phase2_creative_full/phase2_creative_full_seed_summaries.csv
           fi
-          if [ -f runs/phase2_creative_eval/phase2_creative_eval.log ]; then
-            tail -80 runs/phase2_creative_eval/phase2_creative_eval.log
+          if [ -f runs/phase2_creative_full/phase2_creative_full.log ]; then
+            tail -120 runs/phase2_creative_full/phase2_creative_full.log
           fi
 
-      - name: Upload creative web eval artifact
+      - name: Upload full creative graph eval artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase2-creative-eval-results
+          name: phase2-creative-full-results
           path: |
-            runs/phase2_creative_eval/phase2_creative_eval_runs.csv
-            runs/phase2_creative_eval/phase2_creative_eval_summary.csv
-            runs/phase2_creative_eval/phase2_creative_eval_summary.json
-            runs/phase2_creative_eval/phase2_creative_eval.log
+            runs/phase2_creative_full/phase2_creative_full_runs.csv
+            runs/phase2_creative_full/phase2_creative_full_seed_summaries.csv
+            runs/phase2_creative_full/phase2_creative_full_summary.csv
+            runs/phase2_creative_full/phase2_creative_full_summary.json
+            runs/phase2_creative_full/phase2_creative_full.log
           if-no-files-found: warn
