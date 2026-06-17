@@ -24,30 +24,30 @@ jobs:
       - name: Compile package
         run: python -m compileall pentesting_rl
 
-      - name: Run Phase 2 memory-guided web policy comparison smoke
+      - name: Run creativity-focused randomized web evaluation
         run: |
-          python -m pentesting_rl.phase2_web_eval_memory \
-            --runs 4 \
-            --steps 8 \
-            --out-dir runs/phase2_web_eval
+          python -m pentesting_rl.phase2_creative_eval \
+            --scenarios 6 \
+            --steps 10 \
+            --out-dir runs/phase2_creative_eval
 
-      - name: Print Phase 2 summary
+      - name: Print creative evaluation summary
         if: always()
         run: |
-          if [ -f runs/phase2_web_eval/phase2_web_eval_summary.csv ]; then
-            cat runs/phase2_web_eval/phase2_web_eval_summary.csv
+          if [ -f runs/phase2_creative_eval/phase2_creative_eval_summary.csv ]; then
+            cat runs/phase2_creative_eval/phase2_creative_eval_summary.csv
           fi
-          if [ -f runs/phase2_web_eval/phase2_web_eval_runs.csv ]; then
-            head -20 runs/phase2_web_eval/phase2_web_eval_runs.csv
+          if [ -f runs/phase2_creative_eval/phase2_creative_eval_runs.csv ]; then
+            head -30 runs/phase2_creative_eval/phase2_creative_eval_runs.csv
           fi
 
-      - name: Upload Phase 2 web eval artifact
+      - name: Upload creative web eval artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase2-web-eval-results
+          name: phase2-creative-eval-results
           path: |
-            runs/phase2_web_eval/phase2_web_eval_runs.csv
-            runs/phase2_web_eval/phase2_web_eval_summary.csv
-            runs/phase2_web_eval/phase2_web_eval_summary.json
+            runs/phase2_creative_eval/phase2_creative_eval_runs.csv
+            runs/phase2_creative_eval/phase2_creative_eval_summary.csv
+            runs/phase2_creative_eval/phase2_creative_eval_summary.json
           if-no-files-found: warn
