@@ -1,5 +1,5 @@
-# Trigger Paper Trace Run
+# Trigger Workflow Run
 
-This tiny file exists only to trigger trace workflows on `v2`.
+This tiny file exists only to trigger data/trace workflows on `v2`.
 
-Trigger revision: observable trace smoke workflow.
+Trigger revision: public text clue dataset collection.
