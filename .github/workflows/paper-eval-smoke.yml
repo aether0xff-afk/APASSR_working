@@ -36,6 +36,9 @@ jobs:
       - name: Run web probe smoke check
         run: python -m pentesting_rl.web_probe_smoke
 
+      - name: Run DMP web tool integration smoke
+        run: python -m pentesting_rl.dmp_web_smoke
+
       - name: Run smoke paper evaluation
         run: |
           python -m pentesting_rl.paper_eval \
