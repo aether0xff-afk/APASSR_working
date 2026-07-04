@@ -1,0 +1,109 @@
+name: KSEF Paper Evaluation Smoke
+
+on:
+  push:
+    branches: ["v2"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  paper-eval-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install nmap
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nmap
+          nmap --version
+
+      - name: Compile package
+        run: python -m compileall pentesting_rl
+
+      - name: Run text observer smoke check
+        run: python -m pentesting_rl.text_observer_smoke
+
+      - name: Run learned action scorer smoke check
+        run: python -m pentesting_rl.learned_action_scorer_smoke
+
+      - name: Run web probe smoke check
+        run: python -m pentesting_rl.web_probe_smoke
+
+      - name: Run DMP web tool integration smoke
+        run: |
+          mkdir -p runs
+          set +e
+          python -m pentesting_rl.dmp_web_smoke > runs/dmp_web_smoke.log 2>&1
+          status=$?
+          cat runs/dmp_web_smoke.log
+          exit $status
+
+      - name: Run smoke paper evaluation
+        run: |
+          python -m pentesting_rl.paper_eval \
+            --runs 1 \
+            --steps 3 \
+            --out-dir runs/paper_eval_smoke
+
+      - name: Collect public text clue data
+        run: |
+          python -m pentesting_rl.public_text_clue_collector_v3 \
+            --sources juice \
+            --out-dir runs/public_text_clues \
+            --max-lines-per-file 120 \
+            --max-per-label 300
+
+      - name: Print smoke summary CSV
+        if: always()
+        run: |
+          if [ -f runs/paper_eval_smoke/paper_eval_summary.csv ]; then
+            cat runs/paper_eval_smoke/paper_eval_summary.csv
+          fi
+          if [ -f runs/public_text_clues/public_text_clues_summary.json ]; then
+            cat runs/public_text_clues/public_text_clues_summary.json
+          fi
+          if [ -f runs/dmp_web_smoke.log ]; then
+            cat runs/dmp_web_smoke.log
+          fi
+
+      - name: Upload DMP web smoke debug log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmp-web-smoke-debug
+          path: runs/dmp_web_smoke.log
+          if-no-files-found: warn
+
+      - name: Upload smoke paper evaluation artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-eval-smoke-results
+          path: |
+            runs/paper_eval_smoke/paper_eval_runs.csv
+            runs/paper_eval_smoke/paper_eval_summary.csv
+            runs/paper_eval_smoke/paper_eval_summary.json
+          if-no-files-found: warn
+
+      - name: Upload public text clue artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-text-clue-data
+          path: |
+            runs/public_text_clues/public_text_clues_all.csv
+            runs/public_text_clues/public_text_clues_train.csv
+            runs/public_text_clues/public_text_clues_val.csv
+            runs/public_text_clues/public_text_clues_test.csv
+            runs/public_text_clues/public_text_clues_summary.json
+          if-no-files-found: warn

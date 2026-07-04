@@ -1,0 +1,78 @@
+name: KSEF Paper Evaluation
+
+on:
+  push:
+    branches: ["v2"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: "Runs per condition"
+        required: false
+        default: "5"
+      steps:
+        description: "Max steps per run"
+        required: false
+        default: "10"
+      scenario:
+        description: "Scenario"
+        required: false
+        default: "single-flag"
+        type: choice
+        options:
+          - single-flag
+          - multistep-single-flag
+
+jobs:
+  paper-eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install nmap
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nmap
+          nmap --version
+
+      - name: Compile package
+        run: python -m compileall pentesting_rl
+
+      - name: Run paper evaluation
+        shell: bash
+        run: |
+          RUNS="${{ github.event.inputs.runs || '5' }}"
+          STEPS="${{ github.event.inputs.steps || '10' }}"
+          SCENARIO="${{ github.event.inputs.scenario || 'single-flag' }}"
+          python -m pentesting_rl.paper_eval \
+            --runs "$RUNS" \
+            --steps "$STEPS" \
+            --scenario "$SCENARIO" \
+            --out-dir runs/paper_eval
+
+      - name: Print summary CSV
+        if: always()
+        run: |
+          if [ -f runs/paper_eval/paper_eval_summary.csv ]; then
+            cat runs/paper_eval/paper_eval_summary.csv
+          fi
+
+      - name: Upload paper evaluation artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-eval-results
+          path: |
+            runs/paper_eval/paper_eval_runs.csv
+            runs/paper_eval/paper_eval_summary.csv
+            runs/paper_eval/paper_eval_summary.json
+          if-no-files-found: warn

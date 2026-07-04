@@ -1,508 +1,270 @@
-# pentestingRL_KSEF
+# APASSR — KSEF 2026 Paper-Synced Branch
 
-> **Reinforcement Learning 기반 "nmap-only" 자동 펜테스트 에이전트 프로토타입**
->
-> 이 저장소는 학습 가능한 정책(WHAT/HOW/WHERE)과 XML-only 파서를 이용해
-> **로컬 대상(127.0.0.1)** 에서 안전하게 동작하는 모듈형 데모를 제공합니다.
->
-> ⚠️ **중요**: 실제 네트워크 대상에 대한 스캔은 법적·윤리적 책임이 따릅니다.
-> 본 데모는 **로컬 루프백 환경**에서만 사용하세요.
+> **Development of an Automated Pentesting Reinforcement Learning Agent with Solving the Sparse Reward Problem**  
+> 희소 보상 문제를 해결한 자동 펜테스팅 강화학습 에이전트 개발
 
----
+이 브랜치는 KSEF 2026 제출 논문 기준으로 저장소 설명과 실험 범위를 정리한 **paper-synced v2** 브랜치입니다.
 
-## 목차
+논문 제출판의 핵심 범위는 다음과 같습니다.
 
-- [프로젝트 개요](#프로젝트-개요)
-- [핵심 아이디어](#핵심-아이디어)
-- [전체 처리 흐름(End-to-End)](#전체-처리-흐름end-to-end)
-- [모듈 구조 & 데이터 흐름](#모듈-구조--데이터-흐름)
-- [지식 키(KK) 체계](#지식-키kk-체계)
-- [정책(WHAT/HOW/WHERE) 구조](#정책whathowwhere-구조)
-- [보상 설계](#보상-설계)
-- [패키지/디렉터리 구조](#패키지디렉터리-구조)
-- [설치 및 실행](#설치-및-실행)
-  - [1) 빠른 실행 (더미 XML 모드)](#1-빠른-실행-더미-xml-모드)
-  - [2) 로컬 nmap 데모 실행](#2-로컬-nmap-데모-실행)
-  - [3) 한 줄 실행 (CLI)](#3-한-줄-실행-cli)
-  - [4) GUI 실행 (Tkinter)](#4-gui-실행-tkinter)
-  - [5) GUI 실행 (Streamlit)](#5-gui-실행-streamlit)
-- [DVWA MVP 검증 절차](#dvwa-mvp-검증-절차)
-- [커맨드 생성 규칙](#커맨드-생성-규칙)
-- [로그/디버깅](#로그디버깅)
-- [구성 및 커스터마이징](#구성-및-커스터마이징)
-- [보안/윤리 가이드](#보안윤리-가이드)
-- [FAQ](#faq)
-- [개발 컨테이너 주의사항](#개발-컨테이너-주의사항)
+- **단일 정찰 도구**: `nmap`
+- **표준화된 관측 형식**: `nmap -oX -` XML 출력
+- **통제된 로컬 CTF 환경**: `127.0.0.1` / loopback 기반 실험
+- **상태 표현**: KK/KV Knowledge Storage와 업데이트된 KK 집합
+- **행동 공간**: WHAT/HOW/WHERE, 즉 Policy A/B/C로 분해
+- **희소 보상 완화**: FLAG 발견 전에도 KK 업데이트와 예측 오차를 학습 신호로 사용
+- **폐루프 의사결정**: DMP가 행동 선택, 명령 실행, XML 파싱, 지식 갱신, 보상 계산, 정책 갱신, 로그 기록을 연결
+
+> ⚠️ 이 저장소는 연구/학습용 로컬 실험 코드입니다. 허가받지 않은 실제 네트워크 대상에 대한 스캔이나 공격 실험을 목적으로 하지 않습니다.
 
 ---
 
-## 프로젝트 개요
+## 1. Paper Scope vs Working Extensions
 
-`pentestingRL_KSEF`는 "**nmap-only 자동 펜테스트 에이전트**"를
-**강화학습 구조로 모사**하는 연구/실험용 프로토타입입니다.
-실제 공격 프레임워크가 아니라, 다음의 목적을 위한 **구조적 데모**입니다.
+현재 저장소에는 논문 이후 확장 실험을 위해 여러 HTTP/Web tool adapter가 포함되어 있습니다. 하지만 **KSEF 논문 제출판의 실험 범위는 nmap-only / XML-only / local CTF** 입니다.
 
-- **WHAT/HOW/WHERE 슬롯 분리**: 스캔 명령의 선택을 세 정책으로 분리해
-  각 정책의 탐색/학습 가능성을 확인
-- **XML-only 파싱**: `nmap -oX -` 결과만 입력으로 사용하여
-  구조화된 관측(knowledge keys)을 생성
-- **예언/상상 모듈**: 비용이 큰 모델 대신 경량 predictor를 사용하여
-  설계 문서의 핵심 아이디어를 재현
+| 구분 | 논문 제출판 범위 | 현재 working 코드의 확장 |
+| --- | --- | --- |
+| 도구 | `nmap` 단일 도구 | `http-fetch`, `robots-sitemap`, `html-crawler`, `dir-enum`, `hint-scanner`, `stateful-http`, `param-influence` 등 추가 |
+| 관측 | `nmap -oX -` XML | XML + 내부 JSON schema 기반 webtool 출력 |
+| 대상 | 로컬 CTF 서버 | 로컬/사설망 실험용 확장 가능 구조 |
+| 목적 | 희소 보상 완화 구조 검증 | 다중 도구 정책 확장 가능성 탐색 |
 
----
-
-## 핵심 아이디어
-
-1. **정책 분리(WHAT/HOW/WHERE)**
-   - WHAT: 스캔 유형 및 스크립트 조합
-   - HOW: 타이밍, 리트라이, 레이트 제한
-   - WHERE: 포트 범위 및 대상 정의
-
-2. **고정 관측 키(knowledge keys, KK)**
-   - XML 파싱 결과를 KK 목록으로 매핑
-   - 관측 벡터는 **multi-hot** 형태
-
-3. **보상 구성**
-   - 외재 보상: FLAG 탐지, 유의미한 서비스/포트 발견
-   - 내재 보상: 새로운 KK 관측(탐색 가치)
-
-4. **안전한 로컬 데모**
-   - **127.0.0.1 대상**에서만 동작하도록 설계
-   - 외부 네트워크 스캔 금지
+따라서 논문 재현 또는 발표용 설명에서는 **paper mode = nmap-only** 로 설명하는 것이 맞습니다.
 
 ---
 
-## 전체 처리 흐름(End-to-End)
+## 2. Core Idea
 
-아래 흐름은 `DecisionMakingProcess`에서 수행됩니다.
+APASSR의 핵심은 자동화된 명령 실행 자체가 아니라, 펜테스팅 과정을 다음과 같은 순차적 의사결정 문제로 재정의한 것입니다.
 
-1. **현재 KK 벡터 입력**
-2. **WHAT/HOW/WHERE 정책에서 슬롯별 옵션 샘플링**
-3. **커맨드 빌더**가 `nmap {WHAT} {HOW} {WHERE} {Target_IP} -oX -` 생성
-4. **실행기(executor)**가 nmap 실행
-5. **XML 파서**가 결과를 KK 업데이트로 변환
-6. **보상 계산** (extrinsic + intrinsic)
-7. **정책 업데이트 및 종료 조건 확인**
-
----
-
-## 모듈 구조 & 데이터 흐름
-
-```
-┌──────────────────────────────┐
-│ DecisionMakingProcess (dmp)  │
-└──────────┬───────────────────┘
-           │ KK vector
-           ▼
-┌──────────────────────────────┐
-│ Policy A/B/C (WHAT/HOW/WHERE)│
-└──────────┬───────────────────┘
-           │ sampled slots
-           ▼
-┌──────────────────────────────┐
-│ nmap Command Builder         │
-└──────────┬───────────────────┘
-           │ nmap command
-           ▼
-┌──────────────────────────────┐
-│ Executor (nmap or dummy XML) │
-└──────────┬───────────────────┘
-           │ XML output
-           ▼
-┌──────────────────────────────┐
-│ XML Parser                   │
-└──────────┬───────────────────┘
-           │ KK update
-           ▼
-┌──────────────────────────────┐
-│ Reward + KnowledgeStorage    │
-└──────────────────────────────┘
+```text
+관측(XML) → 지식화(KK/KV) → 상태화(ΔKK, error) → 보상 → 정책 갱신
 ```
 
----
-
-## 지식 키(KK) 체계
-
-**KK(knowledge key)**는 관측 토큰의 고정 목록입니다.
-
-- XML 파서는 `nmap -oX`의 결과를 **사전 정의된 KK에 매핑**
-- 매핑되지 않은 정보는 `RAW_*` 형태로 저장하여
-  후속 확장(정책 개선)에서 활용 가능
-- 결과는 **multi-hot 벡터**로 변환되어 정책 입력으로 사용
-
-### 예시 관측
-
-- `PORT_OPEN_80`
-- `SERVICE_HTTP`
-- `OS_LINUX`
-- `SCRIPT_HTTP_TITLE`
-- `FLAG_FOUND`
-- `HTTP_ROBOTS_FOUND`, `HTTP_ROBOTS_HAS_DISALLOW`
-- `HTTP_STATUS_302`, `HTTP_HEADER_LOCATION_PRESENT`, `HTTP_HEADER_XNEXT_PRESENT`
-- `PATH_HINT`, `PATH_SEEN_BUCKET_*`
-- `RAW_BANNER_APACHE_2_4`
-
-### 툴별 KK 문서
-
-툴 확장 시 참고할 수 있도록 **툴별 KK 입력/출력 정의**를 별도 문서로 관리합니다.
-
-- [docs/kk/README.md](docs/kk/README.md)
+기존 체크리스트 기반 점검은 사람이 미리 생각한 경로만 반복하기 쉽습니다. 이 연구는 로컬 CTF 환경에서 에이전트가 직접 행동을 선택하고, 실행 결과에서 새 지식을 얻고, 희소한 FLAG 보상 이전에도 KK 업데이트와 예측 오차를 활용해 탐색을 이어가도록 설계했습니다.
 
 ---
 
-## 정책(WHAT/HOW/WHERE) 구조
+## 3. System Modules
 
-### WHAT 정책
-
-- 스캔 유형/스크립트 조합을 담당
-- 예시 선택지:
-  - `-sS` (SYN scan)
-  - `-sV` (버전 탐지)
-  - `-O` (OS fingerprint)
-  - `--script http-headers,http-title`
-
-### HOW 정책
-
-- 실행 속도/안정성을 조정
-- 예시 선택지:
-  - `-T2`, `-T3`, `-T4`
-  - `--max-retries 1`
-  - `--min-rate 50`
-
-### WHERE 정책
-
-- 포트 범위/대상 정의
-- 예시 선택지:
-  - `-p 80,443,8080`
-  - `-p 1-1024`
-  - `--top-ports 100`
-
-### 툴 계층(TOOL → WHAT/HOW/WHERE)
-
-이제 정책은 **툴 선택**을 상위 계층으로 두고, 각 툴마다 WHAT/HOW/WHERE 테이블을
-별도로 유지합니다. 즉, 실행 순서는 아래와 같습니다.
-
-1. TOOL 정책이 사용할 도구를 선택 (`nmap`, `http-headers`, ...).
-2. 선택된 TOOL에 대해 WHAT/HOW/WHERE 정책을 적용해 실제 커맨드 생성.
-
-툴별 WHAT/HOW/WHERE가 동일한 의미일 필요는 없습니다. 예를 들어 `http-headers`
-툴은 **curl 헤더 수집용 플래그(WHAT/HOW)** 와 **URL 경로(WHERE)** 로 구분하여
-정책 테이블을 구성했습니다.
-
-| TOOL | WHAT (A) | HOW (B) | WHERE (C) |
-| --- | --- | --- | --- |
-| nmap | 스캔 유형, NSE 스크립트 | 타이밍/리트라이/레이트 | 포트 범위/대상 |
-| http-headers | curl 헤더/메서드 플래그 | 타임아웃/리트라이 플래그 | 요청 경로 |
-| http-fetch | HTTP 메서드/헤더 | 타임아웃/리다이렉트 | 요청 경로 |
-| robots-sitemap | robots/sitemap 모드 | 타임아웃 | base 경로 |
-| html-crawler | HTML/JS 크롤링 모드 | 깊이/페이지 제한 | 시작 경로 |
-| dir-enum | 워드리스트 크기 | 메서드/타임아웃 | base 경로 |
-| hint-scanner | 힌트 스캔 모드 | 타임아웃 | 요청 경로 |
-| stateful-http | 쿠키/상태 유지 | 타임아웃/리다이렉트 | 요청 경로 |
-| param-influence | 파라미터 영향 측정 | 타임아웃/샘플 수 | 요청 경로 |
-
-> 참고: `--tool auto`를 사용하면 TOOL 정책이 자동으로 도구를 선택합니다.
+| 논문 모듈 | 역할 | 코드 위치 |
+| --- | --- | --- |
+| Knowledge Storage | KK/KV 형태로 관측 정보 누적 | `pentesting_rl/knowledge.py` |
+| Policy A/B/C | WHAT/HOW/WHERE 행동 공간 분해 | `pentesting_rl/policy.py` |
+| Reward Module | 반복 감쇠, 에러 패널티, KK 업데이트, FLAG 보상, 예측 기반 보상 | `pentesting_rl/reward.py` |
+| Prophecy Module | 다음 상태의 KK 업데이트 및 에러를 예측하는 모듈 | `pentesting_rl/prophecy.py` |
+| Imagination Cycle | 실행 전 후보 행동을 예측 미래로 비교 | `pentesting_rl/dmp.py` |
+| DMP | 행동 선택→실행→파싱→지식 갱신→보상→학습→로그 폐루프 | `pentesting_rl/dmp.py` |
+| XML Parser | `nmap -oX` 결과를 KK 업데이트로 변환 | `pentesting_rl/parser.py` |
+| Local CTF Demo | 통제된 로컬 실험 서버 및 실행 루프 | `pentesting_rl/demo.py` |
 
 ---
 
-## 보상 설계
+## 4. Knowledge Storage: KK/KV
 
-보상은 **extrinsic + intrinsic** 구조입니다.
+Knowledge Storage는 에이전트가 실행 결과에서 얻은 정보를 구조적으로 저장하기 위한 딕셔너리 기반 저장소입니다.
 
-- **Extrinsic** (외재):
-  - FLAG 발견
-  - 의미 있는 서비스/포트 탐지
-- **Intrinsic** (내재):
-  - 새로운 KK 관측
+- **KK(Knowledge Key)**: 명령어 생성과 상태 표현에 쓰이는 고정 키
+- **KV(Knowledge Value)**: 각 KK에 대응하는 실제 관측값 리스트
+- **업데이트된 KK(ΔKK)**: 한 스텝에서 새 값이 추가된 KK 집합
 
-총 보상 합성:
+예시:
 
-```
-Reward = Extrinsic + β * Intrinsic
-β = 0.3
+```text
+Target_IP      → ["127.0.0.1"]
+Open_Ports     → ["tcp/8080"]
+Services       → ["tcp/8080:http"]
+Script_Output  → ["..."]
+Flag           → ["FLAG{...}"]
 ```
 
----
-
-## 패키지/디렉터리 구조
-
-```
-.
-├─ pentesting_rl/
-│  ├─ __init__.py
-│  ├─ __main__.py      # CLI 진입점
-│  ├─ dmp.py            # DecisionMakingProcess 핵심 루프
-│  ├─ knowledge.py      # KK 정의 및 KnowledgeStorage
-│  ├─ parser.py         # nmap XML 파서
-│  ├─ policy.py         # WHAT/HOW/WHERE 정책
-│  ├─ prophecy.py       # 경량 predictor
-│  ├─ reward.py         # 보상 계산
-│  ├─ demo.py           # 로컬 데모 실행
-│  ├─ gui.py            # Tkinter GUI
-│  ├─ streamlit_app.py  # Streamlit GUI
-│  ├─ run_logging.py    # 실행 로그/보고서 저장
-│  ├─ run_session.py    # 실행 세션 헬퍼
-│  ├─ target_utils.py   # 대상/URL 유틸
-│  ├─ tools.py          # Tool 어댑터 레지스트리
-│  └─ webtools.py       # HTTP 기반 Tool 어댑터
-├─ docs/                # 관련 문서
-└─ README.md
-```
+이 구조를 통해 에이전트는 단순 로그 문자열이 아니라, “무엇을 새롭게 알게 되었는가”를 상태로 사용할 수 있습니다.
 
 ---
 
-## 설치 및 실행
+## 5. Policy A/B/C
 
-### 1) 빠른 실행 (더미 XML 모드)
+행동은 하나의 거대한 명령어 공간으로 두지 않고 세 축으로 분해합니다.
 
-`nmap`을 설치하지 않고도, 구조/루프를 검증할 수 있습니다.
-기본 executor는 **더미 XML**을 반환하도록 구성 가능합니다.
+| 정책 | 의미 | 예시 |
+| --- | --- | --- |
+| Policy A / WHAT | 무엇을 할 것인가 | 스캔 유형, NSE script 조합 |
+| Policy B / HOW | 어떻게 수행할 것인가 | timing, retry, rate, timeout |
+| Policy C / WHERE | 어디를 대상으로 할 것인가 | port range, target port set |
+
+명령 생성 형식:
+
+```bash
+nmap {WHAT} {HOW} {WHERE} {Target_IP} -oX -
+```
+
+이 분해는 행동 공간을 해석 가능하게 만들고, 옵션을 축별로 확장할 수 있게 합니다.
+
+---
+
+## 6. Reward Design
+
+보상은 외재 보상과 내재 보상을 결합합니다.
+
+### 6.1 Extrinsic Reward
+
+- 동일 행동 조합 재실행 감쇠
+- syntax/runtime error penalty
+- KK 업데이트 발생 보상
+- FLAG 발견 보상
+
+### 6.2 Intrinsic / Prediction-Based Reward
+
+FLAG는 희소하게만 등장하므로, 매 스텝 더 자주 관측되는 신호가 필요합니다.
+
+이 연구에서는 Prophecy Module이 다음 상태의 KK 업데이트와 오류 발생을 예측하고, 실제 관측과의 차이를 보상 신호로 사용합니다. 즉, FLAG 이전에도 “새로운 정보가 발생할 가능성”과 “예측 불확실성”을 통해 탐색을 유도합니다.
+
+---
+
+## 7. Prophecy and Imagination
+
+### Prophecy Module
+
+최근 전이 데이터와 행동 시퀀스를 바탕으로 다음 상태를 예측합니다.
+
+```text
+aseq_t = {s_{t-1}, a_t, s_t}
+예측 대상 = {ΔKK_{t+1}, e_{t+1}}
+```
+
+현재 working 구현의 `ProphecyModel`은 논문 구조를 재현하기 위한 경량 online predictor 인터페이스입니다. 논문에서 설명한 구조처럼 Transformer/RNN/1D-CNN 등 다른 시계열 모델로 교체할 수 있도록 모듈 경계를 분리해 두었습니다.
+
+### Imagination Cycle
+
+실제 명령을 실행하기 전에 여러 후보 행동을 만들고, Prophecy를 이용해 후보별 미래를 예측합니다. 그중 기대 누적 보상이 큰 행동을 실제 실행합니다.
+
+---
+
+## 8. Paper Reproduction Mode
+
+### 8.1 준비
+
+Python 환경에서 코드 문법 검사를 먼저 수행합니다.
 
 ```bash
 python -m compileall pentesting_rl
 ```
 
-```python
-from pentesting_rl.dmp import DecisionMakingProcess
+`nmap`이 필요합니다.
 
-def run_nmap(command: str):
-    # 실제 nmap 호출 대신 더미 XML 반환
-    return "<nmaprun></nmaprun>", False
+Windows:
 
-dmp = DecisionMakingProcess(executor=run_nmap)
-dmp.run_episode()
+```powershell
+choco install nmap
 ```
 
----
-
-### 2) 로컬 nmap 데모 실행
-
-#### (1) nmap 설치
-
-- **Windows**: [공식 설치 파일](https://nmap.org/download.html#windows)
-  또는 `choco install nmap`
-- **Ubuntu/Debian**:
+Ubuntu/Debian:
 
 ```bash
 sudo apt-get update && sudo apt-get install -y nmap
 ```
 
-#### (2) 데모 실행
+### 8.2 로컬 CTF 데모 실행
 
 ```bash
-python -m pentesting_rl.demo
+python -m pentesting_rl.demo --scenario single-flag --steps 3
 ```
 
-- 로컬 HTTP 대상이 여러 개 자동 생성
-- 3 step 스캔 실행
-- `http-headers`, `http-title` 등을 사용해
-  서로 다른 위치(헤더/타이틀)의 FLAG를 검출
-
-#### (3) 멀티스텝 단일 FLAG 시나리오
+멀티스텝 로컬 시나리오:
 
 ```bash
 python -m pentesting_rl.demo --scenario multistep-single-flag --steps 5
 ```
 
-- `/robots.txt` → 302 Redirect → `X-Next` 헤더 → 최종 Vault 순서로 진행
-- Flask 서버는 `127.0.0.1`에만 바인딩되며, 관측은 XML-only로 처리됩니다.
-
----
-
-### 3) 한 줄 실행 (CLI)
+### 8.3 기준선 비교 실행
 
 ```bash
-python -m pentesting_rl
+python -m pentesting_rl --compare-random --steps 10 --report-dir runs/ksef_ablation
 ```
 
-옵션:
-
-- `--steps N`: 에피소드 스텝 수 지정 (기본 3)
-  - `--compare-random`: 랜덤 베이스라인과 정책 실행 결과 비교
-  - `--target HOST`: 로컬 데모 대신 지정한 대상 IP/호스트 스캔
-  - `--base-url http://HOST:PORT`: base_url 기준 대상 스캔
-  - `--ports 80,443,8080`: `--target` 실행 시 사용할 포트 목록
-  - `--tool nmap|http-headers|http-fetch|robots-sitemap|html-crawler|dir-enum|hint-scanner|stateful-http|param-influence|auto`: 대상 스캔에 사용할 도구 선택
-  - `--report-dir PATH`: run.json/knowledge.json/graph.json/report.md 출력 경로 지정
+현재 CLI 비교는 random baseline과 policy run을 중심으로 동작합니다. 논문식 C0/C1/C2 전체 비교는 GUI 조건 선택 또는 config-level 실행으로 맞추는 것이 가장 정확합니다.
 
 ---
 
-### 4) GUI 실행 (Tkinter)
+## 9. Ablation Conditions
 
-```bash
-python -m pentesting_rl.gui
-```
+논문 설명 기준 조건은 다음처럼 정리합니다.
 
-GUI 기능:
-
-- 조건(Condition) 라디오 버튼: C0/C1/C2
-- 시나리오 선택: `single-flag` / `multistep-single-flag`
-- Target IP/base URL/포트, 에피소드 수, 스텝 수 설정
-- 예언(Prophecy)/상상(Imagination) 토글
-- Tool 선택, Compare-random, Report dir 출력 지원
-- 실행 로그 및 요약 통계 표시
-
----
-
-### 5) GUI 실행 (Streamlit)
-
-Streamlit 기반 GUI로 **base_url 입력, 실행 옵션 선택, runlog/report 조회**를 제공합니다.
-
-```bash
-streamlit run pentesting_rl/streamlit_app.py
-```
-
-## DVWA MVP 검증 절차
-
-DVWA Docker 환경에서 **runlog.jsonl + report.json 생성 여부**를 확인하는 절차는 아래 문서를 참고하세요.
-
-- [docs/dvwa_mvp_test.md](docs/dvwa_mvp_test.md)
-
----
-
-## 커맨드 생성 규칙
-
-- 항상 `-oX -` 옵션 포함 (XML 출력만 파싱)
-- 기본 포맷:
-
-```
-nmap {WHAT} {HOW} {WHERE} {Target_IP} -oX -
-```
-
-- Placeholder 값 기본 설정:
-  - `{PORT_LIST}` → 유명 20개 포트
-  - `{TOP_PORTS}` → [20, 50, 100, 200, 500, 1000]
-  - `{SCRIPT_SET}` → `default/safe/http-*/banner/version/all/auth/brute/discovery/vuln/exploit/dos/broadcast/external/fuzzer/intrusive/malware`
-
----
-
-## 로그/디버깅
-
-콘솔 및 GUI 로그에는 다음 정보가 출력됩니다.
-
-- 선택된 WHAT/HOW/WHERE 슬롯
-- 실제 실행된 nmap 커맨드
-- KK 업데이트 및 보상 값
-- FLAG 탐지 여부
-- 상상(imagination) 롤아웃 후보 및 선택된 추정 보상
-- 정책 테이블(슬롯별 가중치)
-- 지식 저장소(누적 KK 값)
-
-추가 디버깅 방법:
-
-- `print()` 로 정책 선택 및 XML 파싱 결과 확인
-- `knowledge.py`에서 KK 목록 확장 시 로그 출력
-
----
-
-## 구성 및 커스터마이징
-
-### 0. 입력 하이퍼 파라미터 전체 목록 (모두 출력됨)
-
-아래 하이퍼 파라미터는 **실행 시작 시 로그에 모두 출력**되도록 구성되어 있습니다.
-CLI 실행 시에는 `[입력 하이퍼 파라미터]`와 `[DMP config]`가,
-GUI 실행 시에는 `[RUN]` 로그가 각 값을 표시합니다.
-
-#### CLI 입력값 (`python -m pentesting_rl`)
-
-| 파라미터 | 기본값 | 설명 |
+| 조건 | 의미 | 설명 |
 | --- | --- | --- |
-| `--steps` | `3` | DMP 실행 스텝 수 |
-| `--target` | `""` (빈 값) | 로컬 데모 대신 스캔할 대상 IP/호스트 |
-| `--base-url` | `""` (빈 값) | base URL 기준 대상 스캔 |
-| `--ports` | `80,443,8080` | `--target` 사용 시 포트 리스트 |
-| `--compare-random` | `False` | 랜덤 베이스라인과 정책 비교 실행 |
-| `--tool` | `nmap` | 대상 스캔에 사용할 도구 선택 |
-| `--report-dir` | `""` (빈 값) | run.json/knowledge.json/graph.json/report.md 출력 경로 |
+| C0 / base | 기준선 | 정책 학습, 예언, 상상 없이 기본 탐색 |
+| C1 / p | 정책 + 예언 | A/B/C 정책과 Prophecy 기반 보상 사용 |
+| C2 / p+i | 정책 + 예언 + 상상 | 실행 전 후보 행동을 비교한 뒤 선택 |
 
-#### GUI 입력값 (`python -m pentesting_rl.gui`)
+평가 지표:
 
-| 입력 필드 | 기본값 | 설명 |
-| --- | --- | --- |
-| Episodes | `3` | 실행할 에피소드 수 |
-| Max steps/episode | `50` | 에피소드당 최대 스텝 수 |
-| Target IP | `127.0.0.1` | 스캔 대상 |
-| Rollouts | `3` | 상상(imagination) 롤아웃 횟수 |
-| Condition | `C2` | C0/C1/C2 조건 선택 |
-| Prophecy | `ON` | 예언 모델 사용 여부 |
-| Imagination | `ON` | 상상 롤아웃 사용 여부 |
-
-> 참고: GUI에서 Condition 선택은 예언/상상 토글 값을 자동으로 덮어씁니다.
-
-#### DMPConfig 하이퍼 파라미터 (코드 기본값)
-
-| 파라미터 | 기본값 | 설명 |
-| --- | --- | --- |
-| `max_steps` | `50` | 에피소드당 최대 스텝 |
-| `beta` | `0.3` | intrinsic 보상 스케일 |
-| `lambda_err` | `0.5` | 예언 모델의 에러 패널티 계수 |
-| `target_ip` | `127.0.0.1` | 기본 대상 IP |
-| `prophecy_enabled` | `True` | 예언 모델 사용 여부 |
-| `imagination_enabled` | `False` | 상상 롤아웃 사용 여부 |
-| `imagination_rollouts` | `3` | 상상 롤아웃 횟수 |
-| `learning_enabled` | `True` | 정책 업데이트 활성화 여부 |
-
-### 1. KK 확장
-
-- `pentesting_rl/knowledge.py`에서
-  `KK_LIST` 혹은 관련 상수를 수정
-- 새로운 관측 항목 추가 가능
-
-### 2. 정책 확장
-
-- `pentesting_rl/policy.py`의
-  WHAT/HOW/WHERE 행동 공간 수정
-
-### 3. 보상 재설계
-
-- `pentesting_rl/reward.py`에서
-  extrinsic/intrinsic 비율 조정
+- 총 스텝 수
+- FLAG 최초 발견 시간
+- 스텝 효율
+- 전략 다양성
+- 고유 행동 조합 수
+- 반복 실행 감소 여부
 
 ---
 
-## 보안/윤리 가이드
+## 10. Output Logs and Reports
 
-- 이 프로젝트는 **학습/연구용** 데모입니다.
-- 외부 네트워크 대상 스캔은 **법적 허가** 없이 절대 실행하지 마세요.
-- 로컬 환경에서만 재현 가능한 구조로 설계되어 있습니다.
+실행 시 다음 정보를 기록합니다.
 
----
+- 선택된 A/B/C option
+- 생성된 nmap command
+- XML parser가 추출한 KK update
+- reward breakdown
+- FLAG 발견 여부
+- Prophecy/Imagination 관련 정보
+- policy table snapshot
+- knowledge storage snapshot
 
-## FAQ
-
-**Q. 실제 외부 IP를 대상으로 스캔해도 되나요?**
-
-A. 법적·윤리적 책임이 따르므로 권장하지 않습니다.
-데모는 로컬 대상만 사용하세요.
-
-**Q. nmap이 PATH에 없으면 어떻게 되나요?**
-
-A. Windows에서는 기본 설치 경로를 자동 탐지하며,
-필요 시 `NMAP_PATH` 환경변수로 지정 가능합니다.
-찾지 못하면 더미 실행 모드로 전환됩니다.
-
-**Q. Windows 방화벽 팝업이 뜹니다.**
-
-A. 로컬 서버가 127.0.0.1에 바인딩되므로
-`python`에 대해 허용해주세요.
+`--report-dir`를 지정하면 run log와 report artifact를 저장할 수 있습니다.
 
 ---
 
-## 개발 컨테이너 주의사항
+## 11. Safety and Ethics
 
-이 개발 컨테이너는 Linux 기반이며
-Windows VM을 중첩 실행할 수 없습니다.
-Windows 검증은 직접 Windows 호스트에서 실행해주세요.
+이 브랜치의 논문 재현 범위는 로컬 CTF / loopback 실험입니다.
 
----
-
-## 라이선스
-
-별도 명시가 없다면, 본 저장소는 연구/학습 목적의 예제 코드로 제공됩니다.
+- 허가받지 않은 외부 네트워크 스캔 금지
+- 실제 서비스 대상 실험 금지
+- exploit, brute force, credential attack을 목표로 하지 않음
+- 논문 실험은 방어적 연구와 통제된 환경 검증을 목적으로 함
 
 ---
 
-## 참고
+## 12. Known Differences from the Submitted Paper
 
-- nmap 공식 문서: https://nmap.org/book/man.html
-- XML 출력 설명: https://nmap.org/book/output-formats-output-to-xml.html
+이 저장소는 논문 제출 후 계속 확장된 working repository입니다. 따라서 다음 차이가 존재합니다.
+
+1. 논문 제출판은 `nmap-only`였지만, working code에는 multi-tool adapter가 추가되어 있습니다.
+2. 논문은 Prophecy를 시계열 예측 모델 구조로 설명하지만, 현재 기본 구현은 의존성을 줄인 lightweight online predictor입니다.
+3. 논문 실험은 로컬 CTF 환경 중심이며, working code에는 DVWA 및 web reconnaissance 확장 문서가 포함되어 있습니다.
+4. 논문 재현을 위해서는 `v2` 브랜치에서 nmap/local demo 중심으로 실행하는 것을 권장합니다.
+
+---
+
+## 13. Citation / Project Identity
+
+Research title:
+
+```text
+희소 보상 문제를 해결한 자동 펜테스팅 강화학습 에이전트 개발
+Development of an Automated Pentesting Reinforcement Learning Agent with Solving the Sparse Reward Problem
+```
+
+Author:
+
+```text
+이은세, 충남과학고등학교
+Lee-Eun Se, Chungnam Science High School
+```
+
+Keywords:
+
+```text
+Hierarchical Reinforcement Learning, Penetration Testing, Sparse Reward Problem, Knowledge Storage, Prophecy, Imagination Cycle
+```
